@@ -230,6 +230,45 @@ dashboard doesn't fill with blocked rows. One-time setup: create the hook in
 the Vercel project (Settings → Git → Deploy Hooks, branch `main`) and store its
 URL as the GitHub Actions secret `VERCEL_DEPLOY_HOOK_URL` on the repo.
 
+## Divine Insights newsletter (automated, Mon/Wed/Fri)
+
+Card-of-the-day emails to everyone in `NewsletterSubscriber` (the footer
+"Get Daily Divine Insights" form), three times a week.
+
+- **Schedule**: `vercel.json` → `crons` → `/api/cron/newsletter` at
+  `30 2 * * 1,3,5` UTC = **8:00 AM IST Mon/Wed/Fri**. Vercel calls it with
+  `Authorization: Bearer $CRON_SECRET`. (Hobby plan: cron timing can drift
+  within the hour; fine for this.)
+- **Content** (`lib/newsletter.js`): the card is a pure function of the IST
+  date (seeded deck order, day-of-epoch mod 78), so previews match sends and
+  no card repeats within ~33 issues. Text is the card's Universe Message
+  from `data/universe_guidance.json` in Hinglish, English and Hindi — ₹0
+  per issue, no AI key involved. Email links carry
+  `utm_campaign=<issue date>`.
+- **Email**: Resend batch API (100 per call) with `List-Unsubscribe` /
+  one-click headers. Footer link → `/api/newsletter/unsubscribe` →
+  `/newsletter/unsubscribed`. Unsubscribe tokens are an HMAC of the email
+  with `SESSION_SECRET` (nothing stored, can't be forged).
+- **Idempotent**: one `NewsletterIssue` row per IST date; a second run the
+  same day is a no-op unless `?force=1`. `?dry=1` builds everything and
+  sends nothing (returns the counts).
+- **WhatsApp**: `sendWhatsappIssue()` uses Meta's WhatsApp Cloud API with an
+  approved template (`{{1}}` card name, `{{2}}` message). It runs
+  automatically once `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` and
+  `WHATSAPP_TEMPLATE_NAME` (optional `WHATSAPP_TEMPLATE_LANG`) are set;
+  until then the step is skipped and the run reports `whatsappSkipped`.
+- **Preview** an issue in the browser:
+  `/api/newsletter/preview?key=<CRON_SECRET>&date=2026-10-03`.
+
+Env vars: `CRON_SECRET` (any long random string — Vercel sends it on cron
+calls automatically once set), `RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`
+(used for image + link URLs in the email; falls back to the request origin).
+
+**New migration required** —
+`prisma/migrations/20261001120000_add_newsletter_automation/migration.sql`
+(adds `unsubscribedAt`/`lastEmailAt`/`lastWhatsappAt` and the
+`NewsletterIssue` table). Run it in Supabase before the first scheduled send.
+
 ## Structure
 
 - `app/page.js` — top-level screen switcher (auth → onboarding → app)

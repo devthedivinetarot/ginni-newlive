@@ -84,11 +84,31 @@ model Order {
 
 // Footer "Get Daily Divine Insights" signups (email + optional WhatsApp number).
 model NewsletterSubscriber {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  phone     String?
-  source    String   @default("footer")
-  createdAt DateTime @default(now())
+  id             String    @id @default(cuid())
+  email          String    @unique
+  phone          String?
+  source         String    @default("footer")
+  createdAt      DateTime  @default(now())
+  // Newsletter automation (app/api/cron/newsletter). Unsubscribed rows are
+  // kept (so a re-subscribe is a simple upsert) but never mailed again.
+  unsubscribedAt DateTime?
+  lastEmailAt    DateTime?
+  lastWhatsappAt DateTime?
+}
+
+// One row per newsletter send. `issueKey` is the IST date (YYYY-MM-DD) and
+// is unique, so if Vercel's cron fires twice (or someone hits the route by
+// hand) the same issue is never mailed twice.
+model NewsletterIssue {
+  id            String   @id @default(cuid())
+  issueKey      String   @unique
+  card          String
+  emailSent     Int      @default(0)
+  emailFailed   Int      @default(0)
+  whatsappSent  Int      @default(0)
+  whatsappFailed Int     @default(0)
+  startedAt     DateTime @default(now())
+  finishedAt    DateTime?
 }
 
 // "Forgot password" links. Only a SHA-256 hash of the token is stored —
