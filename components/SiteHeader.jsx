@@ -29,6 +29,7 @@ const NAV_LINKS = [
   { href: READING_SITE, label: "Reading", isExternal: true },
   { href: "https://learn.thedivinetarotonline.com/", label: "Course", isExternal: true },
   { href: `${MAIN_SITE}/kundli-milan`, label: "Kundli Milan" },
+  { href: "https://booking.thedivinetarotonline.com/", label: "Personal Booking", isExternal: true },
 ];
 
 const CTA_HREF = READING_SITE;
