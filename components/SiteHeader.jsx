@@ -17,7 +17,6 @@ import { createPortal } from "react-dom";
 //     header, exactly like the site's
 //   - hides on scroll down, returns on scroll up (the site's
 //     transition-transform behaviour) — instead of the old height shrink.
-//
 // Ginni Ki Baatein lives on its own subdomain and has no /about,
 // /kundli-milan or /privacy of its own, so those resolve to the main site.
 const MAIN_SITE = "https://thedivinetarotonline.com";
