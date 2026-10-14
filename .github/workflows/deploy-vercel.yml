@@ -1,18 +1,26 @@
-# Deploys the shared repo's `main` branch to the client's Vercel project.
+# Deploys `main` to the client's Vercel project from GitHub Actions using the
+# Vercel CLI.
 #
-# Why not Vercel's normal Git integration? On a Hobby account Vercel blocks
-# any deployment whose commit author isn't the account owner ("Git author
-# must have access to the project"), so commits from outside developers
-# show up as "Blocked". Deploy Hooks are exempt from that check, so this
-# workflow simply pings the project's hook after every push to `main`.
-# vercel.json turns the automatic Git deployments for `main` off so the
-# dashboard doesn't fill with blocked rows next to the real builds.
+# Why not Vercel's Git integration or a Deploy Hook? The project lives on a
+# Hobby account and the repo is private, and Vercel blocks any deployment
+# attributed to a commit author who isn't the account owner ("The Hobby
+# Plan does not support collaboration for private repositories"). That
+# applies to Deploy Hooks too (they still build the commit). A CLI
+# deployment from CI isn't attributed to a Git author, so it goes through.
+# vercel.json keeps the automatic Git deployments for `main` switched off
+# so the dashboard doesn't fill with Blocked rows.
 #
-# Setup (once, by whoever owns the Vercel project):
-#   1. Vercel project -> Settings -> Git -> Deploy Hooks -> Create Hook
-#      (name: "github-main", branch: main). Copy the URL.
-#   2. GitHub repo -> Settings -> Secrets and variables -> Actions ->
-#      New repository secret: VERCEL_DEPLOY_HOOK_URL = that URL.
+# One-time setup — three repository secrets (Settings > Secrets and
+# variables > Actions):
+#   VERCEL_TOKEN       Vercel account token created by the PROJECT OWNER at
+#                      vercel.com/account/settings/tokens (scope: the account
+#                      that owns the project; expiry: your call).
+#   VERCEL_ORG_ID      From the Vercel project: Settings > General >
+#                      "Team ID" (on a Hobby account this is the personal
+#                      account id, shown in the same place).
+#   VERCEL_PROJECT_ID  Settings > General > "Project ID".
+# Environment variables for the app (DATABASE_URL etc.) stay in Vercel's
+# project settings — `vercel pull` fetches them for the build.
 name: Deploy to Vercel
 
 on:
@@ -20,19 +28,54 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: vercel-production
+  cancel-in-progress: false
+
 jobs:
-  trigger:
+  deploy:
     runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
-      - name: Trigger Vercel deploy hook
+      - name: Check secrets
+        id: check
         env:
-          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+          TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          if [ -z "$HOOK" ]; then
-            echo "::warning title=Deploy skipped::VERCEL_DEPLOY_HOOK_URL secret is not set on this repo, so nothing was deployed. Create a Deploy Hook in the Vercel project (Settings > Git > Deploy Hooks, branch main) and add its URL as a repository secret named VERCEL_DEPLOY_HOOK_URL, then re-run this workflow."
-            echo "Deploy skipped: hook not configured." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+          if [ -z "$TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "::warning title=Deploy skipped::VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID must all be set as repository secrets (see the comments in .github/workflows/deploy-vercel.yml)."
+            echo "Deploy skipped: Vercel secrets not configured." >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
-          curl --fail --silent --show-error -X POST "$HOOK"
-          echo "Deploy hook triggered."
-          echo "Vercel deploy hook triggered for main." >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Vercel CLI
+        if: steps.check.outputs.ready == 'true'
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel project settings and env
+        if: steps.check.outputs.ready == 'true'
+        run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Build
+        if: steps.check.outputs.ready == 'true'
+        run: vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Deploy prebuilt output to production
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          URL=$(vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}")
+          echo "Deployed: $URL"
+          echo "Production deployment: $URL" >> "$GITHUB_STEP_SUMMARY"

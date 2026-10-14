@@ -218,17 +218,27 @@ it):
 Supabase's SQL Editor (or `npx prisma migrate deploy`) before the feature
 goes live; without the table the forgot-password request fails with a 500.
 
-## Deploying from the shared repo (devthedivinetarot/ginni-new)
+## Deploying from the shared repo (devthedivinetarot/ginni-newlive)
 
-The client's Vercel project is on a Hobby account, which blocks Git
-deployments whose commit author isn't the account owner — every commit from
-an outside developer shows as **Blocked**. So deployments there go through a
-Vercel **Deploy Hook** instead, triggered by `.github/workflows/deploy-vercel.yml`
-on every push to `main` (hooks are exempt from the author check), and
-`vercel.json` switches the automatic Git deployments for `main` off so the
-dashboard doesn't fill with blocked rows. One-time setup: create the hook in
-the Vercel project (Settings → Git → Deploy Hooks, branch `main`) and store its
-URL as the GitHub Actions secret `VERCEL_DEPLOY_HOOK_URL` on the repo.
+The client's Vercel project is on a **Hobby** account and the repo is
+**private**, so Vercel blocks every deployment attributed to a commit author
+who isn't the account owner — Git-integration deployments *and* Deploy
+Hooks both show as **Blocked**. Deployments therefore run from GitHub
+Actions with the Vercel CLI (`.github/workflows/deploy-vercel.yml`): the
+runner builds the app and uploads the result with a Vercel token, which
+isn't tied to a Git author. `vercel.json` turns the automatic Git
+deployments for `main` off so the dashboard stays clean.
+
+One-time setup, three repository secrets on GitHub (Settings → Secrets and
+variables → Actions), values from the **client's** Vercel account:
+`VERCEL_TOKEN` (vercel.com/account/settings/tokens), `VERCEL_ORG_ID` and
+`VERCEL_PROJECT_ID` (both under the project's Settings → General). App env
+vars stay in the Vercel project; the workflow pulls them for the build.
+
+Alternatives if preferred: make the repo public (Hobby allows outside
+authors on public repos) or upgrade the Vercel account to Pro and add the
+developer as a member — then the normal Git integration works and this
+workflow can be deleted.
 
 ## Divine Insights newsletter (automated, Mon/Wed/Fri)
 
