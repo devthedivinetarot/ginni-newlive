@@ -41,8 +41,10 @@ export async function POST(req) {
   }
 
   try {
-    const subscribed = !!(user.subscriptionExpires && new Date(user.subscriptionExpires) > new Date());
-    const hasAccess = subscribed || user.readingsUsed < 3 + (user.bonusReadings || 0);
+    // Single source of truth for the gate — summarizeAccess() applies
+    // FREE_READING_LIMIT (0 since Oct 2026: no free readings) plus any
+    // referral bonus. Never hard-code the limit here again.
+    const { subscribed, hasAccess } = summarizeAccess(user);
 
     if (!hasAccess) {
       return NextResponse.json(

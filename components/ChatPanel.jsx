@@ -249,6 +249,24 @@ export default function ChatPanel({
     // in a real reading — either real AI if a provider key is configured
     // (lib/ai.js), or lib/localFallback.js's zero-cost local reading if
     // not, which is the default. See app/api/reveal/route.js.
+    // No subscription (and no bonus readings) → the question is echoed,
+    // Ginni explains, and the paywall opens right here. The server gate in
+    // /api/reading/pick is still the real enforcement; this just stops an
+    // unsubscribed account from walking through the whole draw ritual
+    // only to be refused at the last step.
+    if (access && access.loggedIn && access.hasAccess === false) {
+      const limitText = LIMIT_MESSAGE[lang]?.(name) || LIMIT_MESSAGE.hinglish(name);
+      setMessages((m) => [
+        ...m,
+        { id: nextId(), role: "user", text },
+        { id: nextId(), role: "ginni", kind: "text", text: limitText },
+      ]);
+      setInput("");
+      persistMessage({ role: "user", kind: "text", text });
+      setTimeout(() => setShowPaywall(true), 700);
+      return;
+    }
+
     const matchedId = classifyQuestion(text);
     const useAI = matchedId === null || looksNonLatinScript(text);
     const topic = TOPICS.find((t) => t.id === matchedId) || TOPICS[6]; // Universe Message — also the generic lead-in when useAI
