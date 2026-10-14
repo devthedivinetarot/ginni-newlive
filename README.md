@@ -305,7 +305,14 @@ calls automatically once set), `RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`
 - `data/*.json` — the reading content itself, unmodified except where noted
   in chat history (a handful of genuinely missing cards/translations added)
 
-## Payment module — ₹199/month after 3 free readings
+## Payment module — ₹199/month, no free readings
+
+**Policy (client decision, Oct 2026):** `FREE_READING_LIMIT` in `lib/auth.js`
+is `0` — every account needs the monthly subscription from the first
+reading. The wording everywhere (banner above the composer, paywall modal,
+Ginni's message) is *"Get your reading at just 199/- Rs (Monthly
+subscription)"*. Referral bonus readings still stack on top of the limit, so
+a referred friend's subscription still earns both sides 3 readings.
 
 **Setup:**
 1. Create a Postgres database. Any host works (Neon, Vercel Postgres,
@@ -370,7 +377,7 @@ referred friend's *first* subscription payment is verified
 it can never fire again on a renewal. Signing up alone doesn't trigger
 anything — matching "when a friend... subscribes," not just registers.
 
-`bonusReadings` adds on top of the normal 3-free-reading limit rather than
+`bonusReadings` adds on top of the normal free-reading limit (now 0) rather than
 resetting it (`lib/auth.js`'s `summarizeAccess`, and the same check in
 `/api/reading/pick`), so it stacks cleanly across multiple referrals and
 never interferes with a user's actual usage count.

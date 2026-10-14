@@ -62,7 +62,7 @@ export default function AuthGate({ onAuthed }) {
           {mode === "login"
             ? "Log in to continue your readings."
             : mode === "signup"
-              ? "Create an account to get 3 free readings."
+              ? "Create an account to start your readings."
               : "Enter your email and we'll send you a link to set a new password."}
         </p>
 

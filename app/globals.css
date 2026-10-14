@@ -503,6 +503,11 @@ button{font-family:inherit;}
   margin-top:14px !important;
 }
 
+.paywall-sub{
+  margin:-6px 0 14px;
+  font-size:13px; letter-spacing:0.04em;
+  color:var(--gold-soft);
+}
 .paywall .btn-gold{
   margin-top:22px;
 }

@@ -41,9 +41,9 @@ const CHITCHAT_REPLIES = {
 };
 
 const LIMIT_MESSAGE = {
-  hinglish: (name) => `${name}, aapki 3 free readings poori ho gayi hain. Neeche se 30 din ka full access unlock kijiye. 🌙`,
-  english: (name) => `${name}, your 3 free readings are used up. Unlock 30 days of full access below. 🌙`,
-  hindi: (name) => `${name}, आपकी 3 फ़्री रीडिंग्स पूरी हो गई हैं। नीचे से 30 दिन का फुल एक्सेस अनलॉक कीजिए। 🌙`,
+  hinglish: (name) => `${name}, reading ke liye monthly subscription chahiye — sirf ₹${MONTHLY_PRICE_INR}/month. Neeche se subscribe kijiye aur turant apna card nikaaliye. 🌙`,
+  english: (name) => `${name}, readings need a monthly subscription — just ₹${MONTHLY_PRICE_INR}/month. Subscribe below and draw your card right away. 🌙`,
+  hindi: (name) => `${name}, रीडिंग के लिए मंथली सब्सक्रिप्शन चाहिए — सिर्फ़ ₹${MONTHLY_PRICE_INR}/माह। नीचे से सब्सक्राइब कीजिए और तुरंत अपना कार्ड निकालिए। 🌙`,
 };
 
 // Shown as Ginni's reply the moment /api/verify-payment confirms a payment
@@ -60,24 +60,24 @@ const UNLOCKED_MESSAGE = {
 // right on the screen, not just a note).
 const SUBSCRIBE_LABELS = {
   hinglish: {
-    remaining: (n) => `${n} free reading${n === 1 ? "" : "s"} baaki`,
-    upsell: `Unlimited access — ₹${MONTHLY_PRICE_INR}/month`,
-    payNow: `Free readings khatam — Subscribe karein ₹${MONTHLY_PRICE_INR}/month · Pay & turant unlock`,
-    payNowShort: `Free readings khatam · Subscribe ₹${MONTHLY_PRICE_INR}/month →`,
+    remaining: (n) => `${n} bonus reading${n === 1 ? "" : "s"} baaki`,
+    upsell: `Get your reading at just ${MONTHLY_PRICE_INR}/- Rs (Monthly subscription)`,
+    payNow: `Get your reading at just ${MONTHLY_PRICE_INR}/- Rs (Monthly subscription)`,
+    payNowShort: `Get your reading at just ${MONTHLY_PRICE_INR}/- Rs · Monthly`,
     opening: "Payment khul raha hai…",
   },
   english: {
-    remaining: (n) => `${n} free reading${n === 1 ? "" : "s"} remaining`,
-    upsell: `Unlimited access — ₹${MONTHLY_PRICE_INR}/month`,
-    payNow: `Free readings used — Subscribe ₹${MONTHLY_PRICE_INR}/month · Pay & unlock instantly`,
-    payNowShort: `Free readings used · Subscribe ₹${MONTHLY_PRICE_INR}/month →`,
+    remaining: (n) => `${n} bonus reading${n === 1 ? "" : "s"} remaining`,
+    upsell: `Get your reading at just ${MONTHLY_PRICE_INR}/- Rs (Monthly subscription)`,
+    payNow: `Get your reading at just ${MONTHLY_PRICE_INR}/- Rs (Monthly subscription)`,
+    payNowShort: `Get your reading at just ${MONTHLY_PRICE_INR}/- Rs · Monthly`,
     opening: "Opening payment…",
   },
   hindi: {
-    remaining: (n) => `${n} फ़्री रीडिंग बाकी`,
-    upsell: `अनलिमिटेड एक्सेस — ₹${MONTHLY_PRICE_INR}/माह`,
-    payNow: `फ़्री रीडिंग्स ख़त्म — सब्सक्राइब करें ₹${MONTHLY_PRICE_INR}/माह · पे करें और तुरंत अनलॉक`,
-    payNowShort: `फ़्री रीडिंग्स ख़त्म · सब्सक्राइब ₹${MONTHLY_PRICE_INR}/माह →`,
+    remaining: (n) => `${n} बोनस रीडिंग बाकी`,
+    upsell: `Get your reading at just ${MONTHLY_PRICE_INR}/- Rs (Monthly subscription)`,
+    payNow: `Get your reading at just ${MONTHLY_PRICE_INR}/- Rs (Monthly subscription)`,
+    payNowShort: `Get your reading at just ${MONTHLY_PRICE_INR}/- Rs · Monthly`,
     opening: "पेमेंट खुल रहा है…",
   },
 };

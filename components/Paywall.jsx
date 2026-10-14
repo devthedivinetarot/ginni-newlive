@@ -35,20 +35,20 @@ export default function Paywall({ name, onUnlocked }) {
         <circle cx="23" cy="23" r="21" stroke="var(--gold)" strokeWidth="1" opacity="0.6" />
         <path d="M23 10 L27 20 L37 23 L27 26 L23 36 L19 26 L9 23 L19 20 Z" fill="var(--gold-soft)" opacity="0.85" />
       </svg>
-      <h2>Your 3 free readings are used up</h2>
+      <h2>Get your reading at just {MONTHLY_PRICE_INR}/- Rs</h2>
+      <p className="paywall-sub">(Monthly subscription)</p>
       <p>
-        Ginni&rsquo;s got a lot more to say. Unlock unlimited readings, in any language, for{" "}
-        <b style={{ color: "var(--gold-soft)" }}>₹{MONTHLY_PRICE_INR}/month</b>.
+        Unlimited readings, all 16 questions, in Hinglish, English or Hindi — for 30 days.
       </p>
 
       <button className="btn-gold paywall-btn" onClick={handleSubscribe} disabled={loading}>
-        {loading ? "Opening payment…" : `Unlock full access — ₹${MONTHLY_PRICE_INR}`}
+        {loading ? "Opening payment…" : `Subscribe — ₹${MONTHLY_PRICE_INR}/month`}
       </button>
 
       {error && <p className="prompt" style={{ color: "var(--rose)", marginTop: 14 }}>{error}</p>}
 
       <p className="paywall-fineprint">
-        Secure payment via Razorpay. Unlocks all 15 questions, every language, for 30 days.
+        Secure payment via Razorpay. Access opens the moment payment completes.
       </p>
     </div>
   );
