@@ -240,6 +240,27 @@ authors on public repos) or upgrade the Vercel account to Pro and add the
 developer as a member — then the normal Git integration works and this
 workflow can be deleted.
 
+## Account cleanup (automated, daily)
+
+Client's rule (Oct 2026): anyone who signs up and does not subscribe within
+24 hours is deleted, so the database only ever holds paying readers plus the
+24-hour grace window.
+
+- **Schedule**: `vercel.json` → `crons` → `/api/cron/cleanup-accounts` at
+  `0 21 * * *` UTC = **2:30 AM IST daily**. Vercel calls it with
+  `Authorization: Bearer $CRON_SECRET`. Hobby crons run once a day, so an
+  account is removed 24–48 hours after signup.
+- **Rule** (`app/api/cron/cleanup-accounts/route.js`): `subscriptionExpires`
+  is NULL (never subscribed — a lapsed subscriber keeps their account and
+  can renew) **and** `createdAt` is older than 24 h **and** the email is not
+  in `CLEANUP_PROTECTED_EMAILS` (comma-separated; defaults to the dev and
+  demo accounts).
+- Deletes the user's orders, chat history and reset tokens with them, in
+  one transaction; referral links pointing at a deleted user are cleared.
+- **Dry run** before trusting it: `curl -H "Authorization: Bearer $CRON_SECRET"
+  "$APP_URL/api/cron/cleanup-accounts?dry=1"` lists the emails it would
+  remove. `?limit=N` caps a single run (default 500).
+
 ## Divine Insights newsletter (automated, Mon/Wed/Fri)
 
 Card-of-the-day emails to everyone in `NewsletterSubscriber` (the footer
