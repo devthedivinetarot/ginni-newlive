@@ -45,3 +45,7 @@ env.var.html
 
 # screenshots the Claude desktop app drops into the project folder
 Claude outputs/
+
+# Customer data exports — never commit
+exports/
+*.xlsx
