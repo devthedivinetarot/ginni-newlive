@@ -49,3 +49,4 @@ Claude outputs/
 # Customer data exports — never commit
 exports/
 *.xlsx
+env.var

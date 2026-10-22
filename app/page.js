@@ -87,7 +87,23 @@ export default function Home() {
   }
 
   if (me === null) {
-    return null; // brief blank frame while the session check resolves
+    // The session check (/api/auth/me) is a round trip to the database, so
+    // paint the real page shell straight away instead of a blank screen —
+    // on a slow connection the empty frame read as "the site is broken".
+    return (
+      <div className="site-page">
+        <SiteHeader lang={currentLang} onChangeLang={changeLang} />
+        <div id="onboard">
+          <div className="onboard-card" aria-busy="true">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="The Divine Tarot" className="onboard-glyph" />
+            <h1>Ginni Ki Baatein</h1>
+            <p className="onboard-sub">Checking your session…</p>
+          </div>
+        </div>
+        <SiteFooter />
+      </div>
+    );
   }
 
   async function handleLogout() {
