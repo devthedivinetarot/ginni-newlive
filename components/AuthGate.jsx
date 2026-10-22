@@ -12,6 +12,19 @@ export default function AuthGate({ onAuthed }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Switching between log in / sign up / forgot changes the card's height,
+  // and the browser's scroll anchoring then keeps the clicked link in place
+  // by scrolling the page — so the card's top (logo, title) ends up off
+  // screen. Snap back to the top on every switch.
+  function switchMode(next) {
+    setMode(next);
+    setError(null);
+    setSent(null);
+    if (typeof window !== "undefined") {
+      requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
@@ -136,10 +149,7 @@ export default function AuthGate({ onAuthed }) {
           <button
             type="button"
             className="auth-switch auth-forgot"
-            onClick={() => {
-              setMode("forgot");
-              setError(null);
-            }}
+            onClick={() => switchMode("forgot")}
           >
             Forgot your password?
           </button>
@@ -148,11 +158,7 @@ export default function AuthGate({ onAuthed }) {
         <button
           type="button"
           className="auth-switch"
-          onClick={() => {
-            setMode((m) => (m === "login" ? "signup" : "login"));
-            setError(null);
-            setSent(null);
-          }}
+          onClick={() => switchMode(mode === "login" ? "signup" : "login")}
         >
           {mode === "login"
             ? "New here? Create an account"
