@@ -201,25 +201,56 @@ export default function ChatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const lastGinniRef = useRef(null);
   const threadRef = useRef(null);
+  // How many messages were on screen the last time we scrolled — lets the
+  // effect below react only to *newly added* messages. A reading resolving
+  // its text in place (handleRevealResolved) changes `messages` without
+  // adding anything, and must NOT move the scroll — that re-scroll is what
+  // used to yank people past the reading down to the topic pills.
+  const scrolledCountRef = useRef(0);
   useEffect(() => {
     // Scroll the thread itself, never the page (scrollIntoView would also
     // scroll the window, dragging the sticky header and context bar away).
-    // On phones the quick-reply pills under Ginni's latest message can be
-    // taller than the screen, so park her latest bubble at the top so the
-    // reply and its options read together; otherwise go to the end.
     const thread = threadRef.current;
-    if (!thread) return;
-    const mobile = typeof window !== "undefined" && window.matchMedia("(max-width: 820px)").matches;
-    const anchor = lastGinniRef.current;
-    if (mobile && anchor && messages[messages.length - 1]?.role === "ginni") {
-      const top = anchor.getBoundingClientRect().top - thread.getBoundingClientRect().top + thread.scrollTop - 10;
-      thread.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-    } else {
-      thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" });
+    if (!thread || historyLoading || messages.length === 0) return;
+    const prev = scrolledCountRef.current;
+    if (messages.length <= prev) {
+      scrolledCountRef.current = messages.length;
+      return;
     }
-  }, [messages]);
+    scrolledCountRef.current = messages.length;
+    const added = messages.slice(prev);
+    let lastUserIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") { lastUserIdx = i; break; }
+    }
+
+    // Which message should sit at the top of the thread:
+    // - first load / a reading just arrived → the person's own question, so
+    //   the question and Ginni's answer read top-down, and the topic pills
+    //   stay below where they can be reached by scrolling, not forced on them
+    // - they just asked something → that question
+    // - anything else Ginni adds on her own (follow-up, error, unlock note)
+    //   → the first new bubble
+    let target = null;
+    if (prev === 0 || added.some((m) => m.kind === "reveal")) {
+      target = lastUserIdx >= 0 ? messages[lastUserIdx] : prev === 0 ? null : added[0];
+    } else {
+      target = added[0];
+    }
+
+    if (!target) {
+      thread.scrollTo({ top: 0 });
+      return;
+    }
+    // Wait a frame so the new bubbles are laid out before measuring.
+    requestAnimationFrame(() => {
+      const el = thread.querySelector(`[data-msg-id="${target.id}"]`);
+      if (!el) return;
+      const top = el.getBoundingClientRect().top - thread.getBoundingClientRect().top + thread.scrollTop - 10;
+      thread.scrollTo({ top: Math.max(0, top), behavior: prev === 0 ? "auto" : "smooth" });
+    });
+  }, [messages, historyLoading]);
 
 
   function handleSend(rawText) {
@@ -447,10 +478,10 @@ export default function ChatPanel({
             <div className="chat-bubble ginni">Aapki purani baatein la rahi hoon…</div>
           </div>
         ) : (
-          messages.map((msg, i) => (
+          messages.map((msg) => (
             <div
               key={msg.id}
-              ref={i === messages.length - 1 && msg.role === "ginni" ? lastGinniRef : undefined}
+              data-msg-id={msg.id}
               className="chat-msg-anchor"
             >
               <ChatBubble

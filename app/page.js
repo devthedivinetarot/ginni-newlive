@@ -9,6 +9,23 @@ import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import { TOPICS } from "@/lib/topics";
 
+const LANG_KEY = "ginni:lang";
+function loadLang() {
+  try {
+    const v = window.localStorage.getItem(LANG_KEY);
+    return v === "hinglish" || v === "english" || v === "hindi" ? v : null;
+  } catch {
+    return null;
+  }
+}
+function saveLang(lang) {
+  try {
+    window.localStorage.setItem(LANG_KEY, lang);
+  } catch {
+    // private mode etc. — language just falls back to the default next time
+  }
+}
+
 export default function Home() {
   const [me, setMe] = useState(null); // null while loading; {loggedIn, ...access} once known
   const [session, setSession] = useState(null); // {name, lang} — onboarding personalization, separate from auth
@@ -18,18 +35,56 @@ export default function Home() {
   // toggle. Before a session it seeds onboarding; during one it switches the
   // live session's language (same as the sidebar / settings chips).
   const [uiLang, setUiLang] = useState("hinglish");
+  const [chatKey, setChatKey] = useState(0); // bumped by "Start over" to remount the chat
   const currentLang = session?.lang || uiLang;
   function changeLang(next) {
     setUiLang(next);
+    saveLang(next);
     setSession((prev) => (prev ? { ...prev, lang: next } : prev));
+  }
+
+  // One account = one person. The reading name is the name saved on the
+  // account, so a reload (or a new device) goes straight back into the
+  // chat instead of asking "Your name" again — and nobody can type a
+  // friend's name to stretch one subscription across a whole group.
+  // Onboarding only appears once, for an account that has no name yet.
+  function applyMe(data) {
+    setMe(data);
+    if (data?.loggedIn && data.name) {
+      const lang = loadLang() || uiLang;
+      setUiLang(lang);
+      setSession((prev) => prev || { name: data.name, lang });
+    }
   }
 
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
-      .then(setMe)
+      .then(applyMe)
       .catch(() => setMe({ loggedIn: false }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function handleBegin(name, lang) {
+    saveLang(lang);
+    setUiLang(lang);
+    let savedName = name;
+    try {
+      const res = await fetch("/api/auth/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.name) {
+        savedName = data.name;
+        setMe((prev) => ({ ...prev, name: data.name }));
+      }
+    } catch {
+      // Saving the name is best-effort; the session still starts.
+    }
+    setSession({ name: savedName, lang });
+  }
 
   if (me === null) {
     return null; // brief blank frame while the session check resolves
@@ -56,9 +111,9 @@ export default function Home() {
       <SiteHeader lang={currentLang} onChangeLang={changeLang} />
 
       {!me.loggedIn ? (
-        <AuthGate onAuthed={setMe} />
+        <AuthGate onAuthed={applyMe} />
       ) : !session ? (
-        <Onboarding defaultName={me.name} defaultLang={uiLang} onBegin={(name, lang) => setSession({ name, lang })} />
+        <Onboarding defaultName={me.name} defaultLang={uiLang} onBegin={handleBegin} />
       ) : (
         <div id="app" className="active">
           <Sidebar
@@ -66,10 +121,16 @@ export default function Home() {
             lang={session.lang}
             activeTopicId={activeTopic?.id}
             onSelectTopic={handleSelectTopic}
-            onChangeLang={(lang) => setSession((prev) => ({ ...prev, lang }))}
+            onChangeLang={(lang) => {
+              saveLang(lang);
+              setUiLang(lang);
+              setSession((prev) => ({ ...prev, lang }));
+            }}
             onRestart={() => {
-              setSession(null);
+              // Keeps the account's name — just a fresh look at the chat.
               setActiveTopic(null);
+              setPendingAsk(null);
+              setChatKey((k) => k + 1);
             }}
             onLogout={handleLogout}
             referralCode={me.referralCode}
@@ -77,7 +138,7 @@ export default function Home() {
           <main className="main chat-mode">
             <div className="main-inner chat-main-inner">
               <ChatPanel
-                key={session.name}
+                key={`${session.name}:${chatKey}`}
                 name={session.name}
                 lang={session.lang}
                 access={me}

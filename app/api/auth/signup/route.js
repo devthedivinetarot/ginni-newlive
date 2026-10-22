@@ -26,6 +26,9 @@ export async function POST(req) {
   if (!email || !EMAIL_RE.test(email)) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
   }
+  if (!name || !String(name).trim()) {
+    return NextResponse.json({ error: "Please enter your name." }, { status: 400 });
+  }
   if (!password || password.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
   }

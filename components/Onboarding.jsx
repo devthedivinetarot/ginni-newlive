@@ -40,7 +40,11 @@ export default function Onboarding({ onBegin, defaultName, defaultLang }) {
             autoComplete="off"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            maxLength={60}
           />
+          <p className="onboard-sub" style={{ margin: "8px 0 0", fontSize: 12 }}>
+            Readings are personal — this name is saved to your account and can&rsquo;t be changed later.
+          </p>
         </div>
 
         <div className="field">

@@ -85,10 +85,12 @@ export default function AuthGate({ onAuthed }) {
 
           {mode === "signup" && (
             <div className="field">
-              <label htmlFor="authName">Your name (optional)</label>
+              <label htmlFor="authName">Your name</label>
               <input
                 id="authName"
                 type="text"
+                required
+                maxLength={60}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoComplete="name"
