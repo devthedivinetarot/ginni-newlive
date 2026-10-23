@@ -46,6 +46,21 @@ const LIMIT_MESSAGE = {
   hindi: (name) => `${name}, रीडिंग के लिए मंथली सब्सक्रिप्शन चाहिए — सिर्फ़ ₹${MONTHLY_PRICE_INR}/माह। नीचे से सब्सक्राइब कीजिए और तुरंत अपना कार्ड निकालिए। 🌙`,
 };
 
+// Same moment, for someone whose subscription has run out. Accounts are
+// deleted 24 h after expiry (see app/api/cron/cleanup-accounts), so the
+// message says so plainly — renewing now keeps the chat history.
+const RENEW_MESSAGE = {
+  hinglish: (name) => `${name}, aapka monthly subscription khatam ho gaya hai. ₹${MONTHLY_PRICE_INR} mein abhi renew kijiye — 24 ghante mein renew nahi hua to account aur chat history delete ho jaayegi. 🌙`,
+  english: (name) => `${name}, your monthly subscription has ended. Renew now for ₹${MONTHLY_PRICE_INR} — if it isn't renewed within 24 hours, your account and chat history will be deleted. 🌙`,
+  hindi: (name) => `${name}, आपका मंथली सब्सक्रिप्शन ख़त्म हो गया है। ₹${MONTHLY_PRICE_INR} में अभी रिन्यू कीजिए — 24 घंटे में रिन्यू नहीं हुआ तो अकाउंट और चैट हिस्ट्री डिलीट हो जाएगी। 🌙`,
+};
+
+function paywallMessage(access, lang, name) {
+  const lapsed = !!access?.subscriptionExpires && new Date(access.subscriptionExpires) <= new Date();
+  const table = lapsed ? RENEW_MESSAGE : LIMIT_MESSAGE;
+  return table[lang]?.(name) || table.hinglish(name);
+}
+
 // Shown as Ginni's reply the moment /api/verify-payment confirms a payment
 // made from the "Subscribe now" button below the composer — so the person
 // sees their access open right there in the conversation, no reload.
@@ -286,7 +301,7 @@ export default function ChatPanel({
     // unsubscribed account from walking through the whole draw ritual
     // only to be refused at the last step.
     if (access && access.loggedIn && access.hasAccess === false) {
-      const limitText = LIMIT_MESSAGE[lang]?.(name) || LIMIT_MESSAGE.hinglish(name);
+      const limitText = paywallMessage(access, lang, name);
       setMessages((m) => [
         ...m,
         { id: nextId(), role: "user", text },
@@ -404,7 +419,7 @@ export default function ChatPanel({
       setActiveDraw(null);
       if (data.error === "limit_reached") {
         onAccessChange?.(data);
-        setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text: LIMIT_MESSAGE[lang]?.(name) || LIMIT_MESSAGE.hinglish(name) }]);
+        setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text: paywallMessage(data, lang, name) }]);
         setTimeout(() => setShowPaywall(true), 700);
       } else {
         setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text: data.error || GENERIC_ERROR[lang] || GENERIC_ERROR.hinglish }]);

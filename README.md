@@ -240,26 +240,46 @@ authors on public repos) or upgrade the Vercel account to Pro and add the
 developer as a member — then the normal Git integration works and this
 workflow can be deleted.
 
-## Account cleanup (automated, daily)
+## Subscription lifecycle & account cleanup (automated)
 
-Client's rule (Oct 2026): anyone who signs up and does not subscribe within
-24 hours is deleted, so the database only ever holds paying readers plus the
-24-hour grace window.
+Client's rule (Oct 2026): log in first, then the chat and topics are open to
+every account, but a reading needs a running ₹199/month subscription. Only
+accounts with a running subscription stay in the database; everyone else is
+deleted and their email is kept as a contact in Resend.
 
-- **Schedule**: `vercel.json` → `crons` → `/api/cron/cleanup-accounts` at
-  `0 21 * * *` UTC = **2:30 AM IST daily**. Vercel calls it with
-  `Authorization: Bearer $CRON_SECRET`. Hobby crons run once a day, so an
-  account is removed 24–48 hours after signup.
-- **Rule** (`app/api/cron/cleanup-accounts/route.js`): `subscriptionExpires`
-  is NULL (never subscribed — a lapsed subscriber keeps their account and
-  can renew) **and** `createdAt` is older than 24 h **and** the email is not
-  in `CLEANUP_PROTECTED_EMAILS` (comma-separated; defaults to the dev and
-  demo accounts).
-- Deletes the user's orders, chat history and reset tokens with them, in
-  one transaction; referral links pointing at a deleted user are cleared.
-- **Dry run** before trusting it: `curl -H "Authorization: Bearer $CRON_SECRET"
-  "$APP_URL/api/cron/cleanup-accounts?dry=1"` lists the emails it would
-  remove. `?limit=N` caps a single run (default 500).
+**Getting paid → access** (`lib/subscription.js` → `grantSubscriptionForOrder`)
+is reached three ways, and whichever arrives first wins (the order is claimed
+atomically, so one payment can never grant 60 days):
+1. `/api/verify-payment` — the browser, right after Razorpay checkout.
+2. `/api/razorpay/webhook` — Razorpay itself, for a closed tab / lost
+   network. **Set up once** in Razorpay Dashboard → Account & Settings →
+   Webhooks: URL `https://<site>/api/razorpay/webhook`, secret = the
+   `RAZORPAY_WEBHOOK_SECRET` env var, events `payment.captured` and
+   `order.paid`. Orders from the website / Kundli Milan / courses on the same
+   Razorpay account are acknowledged and ignored.
+3. The cleanup cron below, as a last check before deleting anyone.
+
+**Cleanup** — `/api/cron/cleanup-accounts`, daily at `0 21 * * *` UTC
+(2:30 AM IST, `vercel.json`), `Authorization: Bearer $CRON_SECRET`:
+- **Never paid**, signed up more than 24 h ago → deleted. (A failed payment
+  can be retried during those 24 h.)
+- **Lapsed**, subscription ended more than 24 h ago and not renewed →
+  deleted. In the chat, an expired account sees a renew message warning
+  about this.
+- `CLEANUP_PROTECTED_EMAILS` (comma-separated; defaults to the dev and demo
+  accounts) are never touched.
+- Before deleting: (1) asks Razorpay whether any of the person's unpaid
+  orders was actually captured — if so, grants the 30 days instead; if
+  Razorpay can't be reached, skips that person this run. (2) Saves the email
+  to Resend contacts (`RESEND_SEGMENT_ID` optional, files it into a segment);
+  if Resend refuses or `RESEND_API_KEY` is missing, nobody is deleted.
+- Orders, chat history and reset tokens go with the account, in one
+  transaction; referral links pointing at it are cleared.
+- Hobby crons run once a day, so deletion happens 24–48 h after the cut-off.
+- **Dry run:** `curl -H "Authorization: Bearer $CRON_SECRET"
+  "$APP_URL/api/cron/cleanup-accounts?dry=1"` lists who would be rescued and
+  who would be deleted (never-paid vs lapsed). `?limit=N` caps a run
+  (default 150; Resend's ~2 requests/second limit sets the pace).
 
 ## Divine Insights newsletter (automated, Mon/Wed/Fri)
 
