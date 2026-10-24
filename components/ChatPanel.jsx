@@ -21,6 +21,31 @@ const INTRO = {
     `नमस्ते ${name}! मैं जिन्नी हूँ। अपना सवाल टाइप कीजिए, या सूची में से कोई सवाल चुनिए — मैं समझ कर आपके लिए एक कार्ड निकालती हूँ।`,
 };
 
+// Visitors who aren't logged in see the same chat with no name in it.
+const GUEST_INTRO = {
+  hinglish: () =>
+    "Namaste! Main Ginni hoon. Apna sawaal type kijiye, ya list mein se koi sawaal chuniye — main samajh kar aapke liye ek card nikaalti hoon.",
+  english: () =>
+    "Namaste! I'm Ginni. Type your question, or pick one from the list — I'll understand it and draw a card for you.",
+  hindi: () =>
+    "नमस्ते! मैं जिन्नी हूँ। अपना सवाल टाइप कीजिए, या सूची में से कोई सवाल चुनिए — मैं समझ कर आपके लिए एक कार्ड निकालती हूँ।",
+};
+
+// Ginni's reply when a visitor asks for a reading: account first, then the
+// ₹199 subscription. The sign-up card opens right after this message, and
+// once they're in, the same question is asked again for them.
+const GUEST_ASK_MESSAGE = {
+  hinglish: `Bahut accha sawaal! 🌙 Reading ke liye pehle apna account banaiye — bas 1 minute. Uske baad sirf ₹${MONTHLY_PRICE_INR}/month mein turant apna card nikaaliye.`,
+  english: `Lovely question! 🌙 To get your reading, first create your account — it takes a minute. Then subscribe for just ₹${MONTHLY_PRICE_INR}/month and draw your card right away.`,
+  hindi: `बहुत अच्छा सवाल! 🌙 रीडिंग के लिए पहले अपना अकाउंट बनाइए — बस 1 मिनट। उसके बाद सिर्फ़ ₹${MONTHLY_PRICE_INR}/माह में तुरंत अपना कार्ड निकालिए।`,
+};
+
+const LOGIN_LINK_LABEL = {
+  hinglish: "Pehle se account hai? Log in",
+  english: "Already have an account? Log in",
+  hindi: "पहले से अकाउंट है? लॉग इन",
+};
+
 // In-character replies for pure small talk (see isOffTopicChitchat in
 // lib/classify.js) — no card draw, no credit spent, per Mayank's call.
 // A couple of variants each so it doesn't feel like the same canned line
@@ -153,9 +178,19 @@ export default function ChatPanel({
   onConsumedAsk,
   onTopicResolved,
   onPickTopic,
+  onRequireAuth, // visitor not logged in: open the sign-up / log-in card ({ mode, question?, intent? })
+  autoOpenPay, // just signed up from the pay button: open the payment step once the chat is ready
+  onConsumedPay,
 }) {
-  const [messages, setMessages] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
+  const guest = access?.loggedIn === false;
+  // Visitors have no account to save chat history to.
+  const save = guest ? () => {} : persistMessage;
+  // A visitor's chat starts with the greeting straight away (nothing to load);
+  // ChatPanel is remounted when they log in, so this only ever runs once.
+  const [messages, setMessages] = useState(() =>
+    guest ? [{ id: nextId(), role: "ginni", kind: "text", text: (GUEST_INTRO[lang] || GUEST_INTRO.hinglish)() }] : []
+  );
+  const [historyLoading, setHistoryLoading] = useState(!guest);
   const [input, setInput] = useState("");
   // The card-draw ritual happens full-screen (see DrawOverlay), not inline
   // in the thread — matches chat.thedivinetarotonline.com's own pattern,
@@ -189,6 +224,7 @@ export default function ChatPanel({
   // (or failed) history falls back to the same fresh greeting as before —
   // a brand-new account has never had anything to load.
   useEffect(() => {
+    if (guest) return;
     let cancelled = false;
     fetch("/api/chat/history")
       .then((r) => r.json())
@@ -284,8 +320,8 @@ export default function ChatPanel({
         { id: nextId(), role: "ginni", kind: "text", text: reply },
       ]);
       setInput("");
-      persistMessage({ role: "user", kind: "text", text });
-      persistMessage({ role: "ginni", kind: "text", text: reply });
+      save({ role: "user", kind: "text", text });
+      save({ role: "ginni", kind: "text", text: reply });
       return;
     }
 
@@ -300,6 +336,17 @@ export default function ChatPanel({
     // /api/reading/pick is still the real enforcement; this just stops an
     // unsubscribed account from walking through the whole draw ritual
     // only to be refused at the last step.
+    if (guest) {
+      setMessages((m) => [
+        ...m,
+        { id: nextId(), role: "user", text },
+        { id: nextId(), role: "ginni", kind: "text", text: GUEST_ASK_MESSAGE[lang] || GUEST_ASK_MESSAGE.hinglish },
+      ]);
+      setInput("");
+      setTimeout(() => onRequireAuth?.({ mode: "signup", question: text }), 700);
+      return;
+    }
+
     if (access && access.loggedIn && access.hasAccess === false) {
       const limitText = paywallMessage(access, lang, name);
       setMessages((m) => [
@@ -308,7 +355,7 @@ export default function ChatPanel({
         { id: nextId(), role: "ginni", kind: "text", text: limitText },
       ]);
       setInput("");
-      persistMessage({ role: "user", kind: "text", text });
+      save({ role: "user", kind: "text", text });
       setTimeout(() => setShowPaywall(true), 700);
       return;
     }
@@ -327,8 +374,8 @@ export default function ChatPanel({
       { id: nextId(), role: "ginni", kind: "text", text: greeting },
     ]);
     setInput("");
-    persistMessage({ role: "user", kind: "text", text });
-    persistMessage({ role: "ginni", kind: "text", text: greeting });
+    save({ role: "user", kind: "text", text });
+    save({ role: "ginni", kind: "text", text: greeting });
     setActiveDraw({
       id: nextId(),
       topicId: useAI ? "ai" : matchedId,
@@ -343,21 +390,43 @@ export default function ChatPanel({
   // it never jumps straight to a topic lookup. Deferred one tick so the
   // setState calls inside handleSend() don't run synchronously within this
   // effect's body.
+  // Waits for history to finish loading: right after a visitor signs up or
+  // logs in, the chat remounts and their pending question arrives while the
+  // history fetch is still in flight — handleSend would ignore it then.
+  // Each ask is handled once (by nonce) and cleared only after it has been
+  // sent — no effect cleanup, so a parent re-render can't cancel it midway.
+  const handledAskRef = useRef(null);
   useEffect(() => {
-    if (pendingAsk?.text) {
-      const t = setTimeout(() => handleSend(pendingAsk.text), 0);
+    if (!pendingAsk?.text || historyLoading) return;
+    if (handledAskRef.current === pendingAsk.nonce) return;
+    handledAskRef.current = pendingAsk.nonce;
+    const ask = pendingAsk.text;
+    setTimeout(() => {
+      handleSend(ask);
       onConsumedAsk?.();
-      return () => clearTimeout(t);
-    }
+    }, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingAsk]);
+  }, [pendingAsk, historyLoading]);
+
+  // A visitor who tapped the pay button and then signed up lands here with
+  // autoOpenPay — open the subscription step straight away.
+  const handledPayRef = useRef(false);
+  useEffect(() => {
+    if (!autoOpenPay || historyLoading || guest || handledPayRef.current) return;
+    handledPayRef.current = true;
+    setTimeout(() => {
+      if (access?.hasAccess === false) setShowPaywall(true);
+      onConsumedPay?.();
+    }, 300);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenPay, historyLoading]);
 
   function handleCancelDraw() {
     if (busyRef.current) return; // a card is already being charged/fetched — too late to cancel
     setActiveDraw(null);
     const text = CANCELLED_NOTE[lang] || CANCELLED_NOTE.hinglish;
     setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text }]);
-    persistMessage({ role: "ginni", kind: "text", text });
+    save({ role: "ginni", kind: "text", text });
   }
 
   // Called by RevealCard the first time a reveal actually resolves to real
@@ -370,7 +439,7 @@ export default function ChatPanel({
     setMessages((m) => m.map((msg) => (msg.id === msgId ? { ...msg, resolvedText: text } : msg)));
     if (persistedRevealIds.current.has(msgId)) return;
     persistedRevealIds.current.add(msgId);
-    persistMessage({ role: "ginni", kind: "reveal", text, card, aiMode });
+    save({ role: "ginni", kind: "reveal", text, card, aiMode });
   }
 
   // Free, unlimited elaboration on a card already revealed — no new draw,
@@ -387,7 +456,7 @@ export default function ChatPanel({
       const data = await res.json();
       const text = data.available ? data.text : data.fallbackMessage || GENERIC_ERROR[lang] || GENERIC_ERROR.hinglish;
       setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text }]);
-      persistMessage({ role: "ginni", kind: "text", text });
+      save({ role: "ginni", kind: "text", text });
     } catch {
       const text = NETWORK_ERROR[lang] || NETWORK_ERROR.hinglish;
       setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text }]);
@@ -439,7 +508,7 @@ export default function ChatPanel({
         { id: nextId(), role: "ginni", kind: "reveal", card: cardName, pickToken, aiMode },
         { id: nextId(), role: "ginni", kind: "text", text: closing },
       ]);
-      persistMessage({ role: "ginni", kind: "text", text: closing });
+      save({ role: "ginni", kind: "text", text: closing });
       setActiveDraw(null);
       setBusy(false);
     }, 620); // matches the existing card-flip timing from the original ReadingPanel.jsx
@@ -459,6 +528,10 @@ export default function ChatPanel({
   // confirms it in the thread. Same server-side verification as the
   // Paywall modal; this just removes the extra step of finding the modal.
   async function handlePayNow() {
+    if (guest) {
+      onRequireAuth?.({ mode: "signup", intent: "pay" });
+      return;
+    }
     if (payBusy) return;
     setPayError(null);
     setPayBusy(true);
@@ -471,7 +544,7 @@ export default function ChatPanel({
           onAccessChange?.(newAccess);
           const text = UNLOCKED_MESSAGE[lang]?.(name) || UNLOCKED_MESSAGE.hinglish(name);
           setMessages((m) => [...m, { id: nextId(), role: "ginni", kind: "text", text }]);
-          persistMessage({ role: "ginni", kind: "text", text });
+          save({ role: "ginni", kind: "text", text });
         },
         onError: (message) => {
           setPayError(message);
@@ -545,6 +618,11 @@ export default function ChatPanel({
                       <span className="label-short">{L.payNowShort}</span>
                     </>
                   )}
+                </button>
+              )}
+              {guest && (
+                <button type="button" className="chat-login-link" onClick={() => onRequireAuth?.({ mode: "login" })}>
+                  {LOGIN_LINK_LABEL[lang] || LOGIN_LINK_LABEL.hinglish}
                 </button>
               )}
               {payError && <span className="chat-pay-error">{payError}</span>}

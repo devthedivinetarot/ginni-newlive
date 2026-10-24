@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import PasswordInput from "./PasswordInput";
 
-export default function AuthGate({ onAuthed }) {
-  const [mode, setMode] = useState("login"); // "login" | "signup" | "forgot"
+// Log in / sign up / forgot password.
+// - Full page (default): the old standalone screen.
+// - modal: pops over the chat for a visitor who isn't logged in yet — opened
+//   the moment they ask a question or tap the pay button (see app/page.js).
+//   `intro` replaces the sub-heading so the card says why it appeared;
+//   `onClose` adds the ✕ and backdrop-click to dismiss.
+export default function AuthGate({ onAuthed, initialMode = "login", modal = false, onClose, intro }) {
+  const [mode, setMode] = useState(initialMode); // "login" | "signup" | "forgot"
   const [sent, setSent] = useState(null); // confirmation text after a reset email is requested
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,7 +27,7 @@ export default function AuthGate({ onAuthed }) {
     setMode(next);
     setError(null);
     setSent(null);
-    if (typeof window !== "undefined") {
+    if (!modal && typeof window !== "undefined") {
       requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" }));
     }
   }
@@ -65,14 +72,20 @@ export default function AuthGate({ onAuthed }) {
     }
   }
 
-  return (
-    <div id="onboard">
-      <div className="onboard-card">
+  const card = (
+      <div className={"onboard-card" + (modal ? " auth-modal-card" : "")}>
+        {modal && onClose && (
+          <button type="button" className="chat-modal-close" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="The Divine Tarot" className="onboard-glyph" />
         <h1>Ginni Ki Baatein</h1>
         <p className="onboard-sub">
-          {mode === "login"
+          {intro && mode !== "forgot"
+            ? intro
+            : mode === "login"
             ? "Log in to continue your readings."
             : mode === "signup"
               ? "Create an account to start your readings."
@@ -167,6 +180,18 @@ export default function AuthGate({ onAuthed }) {
               : "Back to log in"}
         </button>
       </div>
-    </div>
   );
+
+  if (modal) {
+    if (typeof document === "undefined") return null;
+    return createPortal(
+      <div className="chat-modal-backdrop" onClick={onClose}>
+        <div className="auth-modal-wrap" onClick={(e) => e.stopPropagation()}>
+          {card}
+        </div>
+      </div>,
+      document.body
+    );
+  }
+  return <div id="onboard">{card}</div>;
 }

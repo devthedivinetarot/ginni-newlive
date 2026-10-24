@@ -242,8 +242,12 @@ workflow can be deleted.
 
 ## Subscription lifecycle & account cleanup (automated)
 
-Client's rule (Oct 2026): log in first, then the chat and topics are open to
-every account, but a reading needs a running ₹199/month subscription. Only
+Client's rule (Oct 2026): the chat and all topics are open to everyone,
+including visitors who aren't logged in. Asking a question (typed, topic list
+or pill) or tapping the pay button opens the sign-up / log-in card over the
+chat (`AuthGate modal`, app/page.js); after they're in, the same question is
+sent again — it opens the ₹199 paywall, or goes straight to the reading for an
+existing subscriber. A reading always needs a running subscription. Only
 accounts with a running subscription stay in the database; everyone else is
 deleted and their email is kept as a contact in Resend.
 

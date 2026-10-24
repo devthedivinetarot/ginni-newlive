@@ -10,7 +10,10 @@ const LANGS = [
   { key: "hindi", label: "हिं" },
 ];
 
-export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onChangeLang, onRestart, onLogout, referralCode }) {
+// `name` is null for a visitor who isn't logged in: the "Reading for …" line
+// becomes a plain heading, "Invite a friend" is hidden (no referral code
+// yet) and onLogin replaces onLogout.
+export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onChangeLang, onRestart, onLogout, onLogin, referralCode }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const activeTopic = TOPICS.find((t) => t.id === activeTopicId) || null;
@@ -22,7 +25,7 @@ export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onCh
           opens the sheet below (language / invite / start over / log out). */}
       <div className="mobile-topbar">
         <span className="mobile-topbar-user">
-          Reading for <b>{name}</b>
+          {name ? <>Reading for <b>{name}</b></> : <b>Ginni Ki Baatein</b>}
         </span>
         <button
           type="button"
@@ -41,7 +44,7 @@ export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onCh
       <div className={"mobile-settings-panel" + (panelOpen ? " open" : "")} role="dialog" aria-label="Settings" aria-hidden={!panelOpen}>
         <div className="qsheet-handle" aria-hidden="true" />
         <div className="mobile-settings-head">
-          <span>Reading for <b>{name}</b></span>
+          <span>{name ? <>Reading for <b>{name}</b></> : <b>Ginni Ki Baatein</b>}</span>
           <button type="button" className="qsheet-close" aria-label="Close" onClick={() => setPanelOpen(false)}>✕</button>
         </div>
         {onChangeLang && (
@@ -60,15 +63,22 @@ export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onCh
             </div>
           </div>
         )}
-        <button className="restart-link" onClick={() => { setPanelOpen(false); setInviteOpen(true); }}>
-          Invite a friend
-        </button>
+        {referralCode && (
+          <button className="restart-link" onClick={() => { setPanelOpen(false); setInviteOpen(true); }}>
+            Invite a friend
+          </button>
+        )}
         <button className="restart-link" onClick={onRestart}>
           Start over
         </button>
         {onLogout && (
           <button className="restart-link" onClick={onLogout}>
             Log out
+          </button>
+        )}
+        {onLogin && (
+          <button className="restart-link" onClick={() => { setPanelOpen(false); onLogin(); }}>
+            Log in
           </button>
         )}
       </div>
@@ -81,7 +91,7 @@ export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onCh
           <span className="brand">Ginni Ki Baatein</span>
         </div>
         <div className="sidebar-user">
-          Reading for <b>{name}</b> · {LANG_LABEL[lang]}
+          {name ? <>Reading for <b>{name}</b> · {LANG_LABEL[lang]}</> : <>Pick a question · {LANG_LABEL[lang]}</>}
         </div>
 
         <ul className="topic-list">
@@ -123,9 +133,10 @@ export default function Sidebar({ name, lang, activeTopicId, onSelectTopic, onCh
         <div className="sidebar-footer">
           Each spread is shuffled fresh. Pick with an open mind — the card that calls to you is the
           one meant for you.
-          <button onClick={() => setInviteOpen(true)}>Invite a friend</button>
+          {referralCode && <button onClick={() => setInviteOpen(true)}>Invite a friend</button>}
           <button onClick={onRestart}>Start over</button>
           {onLogout && <button onClick={onLogout}>Log out</button>}
+          {onLogin && <button onClick={onLogin}>Log in</button>}
         </div>
       </aside>
 

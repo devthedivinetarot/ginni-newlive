@@ -36,6 +36,13 @@ export default function Home() {
   // live session's language (same as the sidebar / settings chips).
   const [uiLang, setUiLang] = useState("hinglish");
   const [chatKey, setChatKey] = useState(0); // bumped by "Start over" to remount the chat
+  // Visitors (not logged in) get the full chat and topic list. Asking for a
+  // reading or tapping the pay button opens this sign-up / log-in card over
+  // the chat: { mode, question?, intent? }. After they're in, the question
+  // they asked is sent again for them (it then hits the ₹199 paywall, or
+  // goes straight to the reading for an existing subscriber).
+  const [authPrompt, setAuthPrompt] = useState(null);
+  const [payIntent, setPayIntent] = useState(false);
   const currentLang = session?.lang || uiLang;
   function changeLang(next) {
     setUiLang(next);
@@ -111,7 +118,18 @@ export default function Home() {
     setMe({ loggedIn: false });
     setSession(null);
     setActiveTopic(null);
+    setPendingAsk(null);
   }
+
+  function handleAuthedFromPrompt(data) {
+    const prompt = authPrompt || {};
+    setAuthPrompt(null);
+    applyMe(data);
+    if (prompt.question) setPendingAsk({ text: prompt.question, nonce: Date.now() });
+    if (prompt.intent === "pay") setPayIntent(true);
+  }
+
+  const guest = !me.loggedIn;
 
   // Clicking a question in the sidebar fills the chat input with its exact
   // title and sends it — it goes through the same classifyQuestion() step
@@ -126,47 +144,60 @@ export default function Home() {
     <div className="site-page">
       <SiteHeader lang={currentLang} onChangeLang={changeLang} />
 
-      {!me.loggedIn ? (
-        <AuthGate onAuthed={applyMe} />
-      ) : !session ? (
+      {!guest && !session ? (
         <Onboarding defaultName={me.name} defaultLang={uiLang} onBegin={handleBegin} />
       ) : (
         <div id="app" className="active">
           <Sidebar
-            name={session.name}
-            lang={session.lang}
+            name={guest ? null : session.name}
+            lang={currentLang}
             activeTopicId={activeTopic?.id}
             onSelectTopic={handleSelectTopic}
-            onChangeLang={(lang) => {
-              saveLang(lang);
-              setUiLang(lang);
-              setSession((prev) => ({ ...prev, lang }));
-            }}
+            onChangeLang={changeLang}
             onRestart={() => {
               // Keeps the account's name — just a fresh look at the chat.
               setActiveTopic(null);
               setPendingAsk(null);
               setChatKey((k) => k + 1);
             }}
-            onLogout={handleLogout}
+            onLogout={guest ? undefined : handleLogout}
+            onLogin={guest ? () => setAuthPrompt({ mode: "login" }) : undefined}
             referralCode={me.referralCode}
           />
           <main className="main chat-mode">
             <div className="main-inner chat-main-inner">
               <ChatPanel
-                key={`${session.name}:${chatKey}`}
-                name={session.name}
-                lang={session.lang}
+                key={guest ? `guest:${chatKey}` : `${session.name}:${chatKey}`}
+                name={guest ? null : session.name}
+                lang={currentLang}
                 access={me}
                 onAccessChange={(newAccess) => setMe((prev) => ({ ...prev, ...newAccess }))}
                 pendingAsk={pendingAsk}
                 onConsumedAsk={() => setPendingAsk(null)}
                 onTopicResolved={(topicId) => setActiveTopic(TOPICS.find((t) => t.id === topicId) || null)}
                 onPickTopic={handleSelectTopic}
+                onRequireAuth={setAuthPrompt}
+                autoOpenPay={payIntent}
+                onConsumedPay={() => setPayIntent(false)}
               />
             </div>
           </main>
         </div>
+      )}
+
+      {authPrompt && (
+        <AuthGate
+          key={authPrompt.mode}
+          modal
+          initialMode={authPrompt.mode}
+          intro={
+            authPrompt.mode === "signup"
+              ? "Create your account to get your reading — then subscribe for just ₹199/month."
+              : undefined
+          }
+          onClose={() => setAuthPrompt(null)}
+          onAuthed={handleAuthedFromPrompt}
+        />
       )}
 
       <SiteFooter />

@@ -1879,3 +1879,12 @@ button{font-family:inherit;}
   .field .password-input, .site-footer-input,
   input[type=text], input[type=email], input[type=password], input[type=tel], textarea, select{ font-size:16px; }
 }
+
+/* Sign-up / log-in card popped over the chat for visitors (AuthGate modal). */
+.auth-modal-wrap{width:100%; max-width:460px; max-height:92vh; overflow-y:auto; border-radius:20px;}
+.auth-modal-card{position:relative; animation:fadeInUp .3s cubic-bezier(.2,.6,.2,1) both;}
+@media (max-width:820px){
+  .auth-modal-card{padding:32px 20px 24px;}
+}
+/* "Already have an account? Log in" next to the pay button for visitors. */
+.chat-login-link{background:none; border:none; padding:0 4px; color:var(--gold-light, #ffe4a8); text-decoration:underline; font:inherit; font-size:13px; cursor:pointer;}
