@@ -42,22 +42,39 @@ export async function POST(req) {
       );
     }
 
-    const rz = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET });
-    const payments = await rz.orders.fetchPayments(order.razorpayOrderId);
-    const payment = (payments?.items || []).find((p) => p.status === "captured");
-    if (!payment) {
-      return NextResponse.json(
-        { error: "Razorpay has no captured payment for this order (it may already be refunded)." },
-        { status: 409 }
-      );
+    // Claim the order before touching Razorpay: two clicks (or two admins)
+    // at the same moment can't both refund it. Released again if Razorpay
+    // says no, so the admin can retry.
+    const claim = await withRetry(() =>
+      prisma.order.updateMany({ where: { id: order.id, status: "paid" }, data: { status: "refunding" } })
+    );
+    if (claim.count === 0) {
+      return NextResponse.json({ error: "A refund for this order is already in progress or done." }, { status: 409 });
     }
 
-    const refund = await rz.payments.refund(payment.id, {
-      amount: amountPaise,
-      speed: "normal",
-      notes: { reason: "Refunded from Ginni admin", by: admin.email, account: order.user.email },
-      receipt: `gkb_refund_${order.id}`.slice(0, 40),
-    });
+    let refund;
+    let payment;
+    try {
+      const rz = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET });
+      const payments = await rz.orders.fetchPayments(order.razorpayOrderId);
+      payment = (payments?.items || []).find((p) => p.status === "captured");
+      if (!payment) {
+        await prisma.order.update({ where: { id: order.id }, data: { status: "paid" } });
+        return NextResponse.json(
+          { error: "Razorpay has no captured payment for this order (it may already be refunded)." },
+          { status: 409 }
+        );
+      }
+      refund = await rz.payments.refund(payment.id, {
+        amount: amountPaise,
+        speed: "normal",
+        notes: { reason: "Refunded from Ginni admin", by: admin.email, account: order.user.email },
+        receipt: `gkb_refund_${order.id}`.slice(0, 40),
+      });
+    } catch (err) {
+      await prisma.order.update({ where: { id: order.id }, data: { status: "paid" } }).catch(() => {});
+      throw err;
+    }
 
     await withRetry(() =>
       prisma.$transaction([
