@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { withRetry } from "@/lib/withRetry";
 import { isEmailConfigured, saveContactToResend } from "@/lib/email";
 import { grantSubscriptionForOrder, orderHasCapturedPayment } from "@/lib/subscription";
+import { adminEmails } from "@/lib/admin";
 
 // Client's rule (Oct 2026): only accounts with a running subscription stay
 // in the database. Everyone else is deleted, and their email is kept as a
@@ -31,12 +32,17 @@ export const dynamic = "force-dynamic";
 
 const GRACE_HOURS = 24;
 const RESEND_GAP_MS = 550; // Resend allows ~2 requests/second per account
-const PROTECTED = new Set(
-  (process.env.CLEANUP_PROTECTED_EMAILS || "dev.sitelytc@gmail.com,demo@ginnikibaatein.com")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
-);
+// Admin accounts (ADMIN_EMAILS) are always protected too, so the admin can
+// never be cleaned up for not having a subscription.
+function protectedEmails() {
+  return new Set([
+    ...(process.env.CLEANUP_PROTECTED_EMAILS || "dev.sitelytc@gmail.com,demo@ginnikibaatein.com")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+    ...adminEmails(),
+  ]);
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -77,13 +83,14 @@ export async function GET(req) {
           email: true,
           name: true,
           subscriptionExpires: true,
-          orders: { where: { status: { not: "paid" } }, select: { razorpayOrderId: true } },
+          orders: { where: { status: "created" }, select: { razorpayOrderId: true } },
         },
         orderBy: { createdAt: "asc" },
         take: limit,
       })
     );
 
+    const PROTECTED = protectedEmails();
     const rescued = [];
     const doomed = [];
     for (const u of candidates) {

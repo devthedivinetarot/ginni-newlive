@@ -76,7 +76,7 @@ model Order {
   user            User     @relation(fields: [userId], references: [id])
   razorpayOrderId String   @unique
   amount          Int
-  status          String   @default("created") // created -> paid
+  status          String   @default("created") // created -> paid -> refunded (admin page)
   createdAt       DateTime @default(now())
 
   @@index([userId])

@@ -285,6 +285,29 @@ atomically, so one payment can never grant 60 days):
   who would be deleted (never-paid vs lapsed). `?limit=N` caps a run
   (default 150; Resend's ~2 requests/second limit sets the pace).
 
+## Admin page (`/admin`)
+
+Subscribers list with name, login ID (email), subscribed-on (first payment),
+valid till (+ days left), total paid, and per-account actions:
+- **Extend** — add 7/15/30/90/365 or any number of days on top of what's
+  left (or from today if it has run out). Works for never-paid accounts too.
+- **End** — access stops now; the daily cleanup deletes the account 24 h
+  later (email kept in Resend), unless it's extended again first.
+- **Refund** — pick a paid order, full or partial amount, refunded through
+  Razorpay (`payments.refund`, normal speed, 5–7 working days). The order is
+  marked `refunded` so no webhook replay or cleanup check can grant access
+  from it again; "also end subscription now" is ticked by default.
+
+Tabs: Active / Expired / Never paid / All accounts, plus search. Data is read
+live from the database on every load, so accounts deleted by the cleanup
+disappear from the page automatically.
+
+**Access:** set `ADMIN_EMAILS` on Vercel (comma-separated). Those accounts
+log in on the normal page, then open `/admin`. Everyone else gets "not an
+admin" and every `/api/admin/*` route returns 401/403. Changes also require a
+same-site `Origin` header. Admin accounts are never deleted by the cleanup.
+Admin actions are logged to Vercel function logs as `[admin] …`.
+
 ## Divine Insights newsletter (automated, Mon/Wed/Fri)
 
 Card-of-the-day emails to everyone in `NewsletterSubscriber` (the footer
