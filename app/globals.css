@@ -1957,3 +1957,9 @@ button{font-family:inherit;}
   .admin-actions{justify-content:flex-start !important; padding-top:8px !important;}
   .admin-actions .admin-btn{margin:0 6px 0 0;}
 }
+
+/* Admin pagination (100 rows per page) */
+.admin-pager{display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:14px;}
+.admin-pager-btns{display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+.admin-page-num{min-width:36px; height:36px; border-radius:999px; border:1px solid var(--hairline-strong); background:transparent; color:var(--text-primary); font-size:13px; cursor:pointer;}
+.admin-page-num.active{border-color:var(--gold, #f4c542); background:rgba(244,197,66,0.14); font-weight:600;}

@@ -21,6 +21,8 @@ function daysLeft(d) {
   return Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
 }
 
+const PAGE_SIZE = 100;
+
 const FILTERS = [
   { key: "active", label: "Active" },
   { key: "expired", label: "Expired" },
@@ -43,6 +45,7 @@ export default function AdminPage() {
   const [state, setState] = useState({ loading: true, error: null, status: 200, rows: [], admin: null });
   const [filter, setFilter] = useState("active");
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1); // 100 rows per page
   const [extendFor, setExtendFor] = useState(null); // row
   const [refundFor, setRefundFor] = useState(null); // row
   const [toast, setToast] = useState(null);
@@ -87,6 +90,16 @@ export default function AdminPage() {
       .filter((r) => filter === "all" || r.status === filter)
       .filter((r) => !q || r.email.toLowerCase().includes(q) || (r.name || "").toLowerCase().includes(q));
   }, [state.rows, filter, query]);
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages); // e.g. after a refresh shrinks the list
+  const pageRows = visible.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const firstShown = visible.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
+  const lastShown = Math.min(currentPage * PAGE_SIZE, visible.length);
+  function goTo(n) {
+    setPage(Math.min(Math.max(1, n), totalPages));
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   async function endSubscription(row) {
     if (!window.confirm(`End ${row.email}'s subscription now?\n\nAccess stops immediately. The account is deleted by the daily cleanup 24 hours later (email kept in Resend) unless it is extended again.`)) return;
@@ -155,7 +168,7 @@ export default function AdminPage() {
               role="tab"
               aria-selected={filter === f.key}
               className={"admin-tab" + (filter === f.key ? " active" : "")}
-              onClick={() => setFilter(f.key)}
+              onClick={() => { setFilter(f.key); setPage(1); }}
             >
               {f.label} <b>{counts[f.key]}</b>
             </button>
@@ -166,7 +179,7 @@ export default function AdminPage() {
           type="search"
           placeholder="Search name or email"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => { setQuery(e.target.value); setPage(1); }}
         />
       </section>
 
@@ -185,7 +198,7 @@ export default function AdminPage() {
             </tr>
           </thead>
           <tbody>
-            {visible.map((r) => {
+            {pageRows.map((r) => {
               const left = daysLeft(r.validTill);
               const canRefund = r.orders.some((o) => o.status === "paid");
               return (
@@ -229,6 +242,17 @@ export default function AdminPage() {
           </tbody>
         </table>
       </div>
+
+      {visible.length > 0 && (
+        <Pager
+          page={currentPage}
+          totalPages={totalPages}
+          first={firstShown}
+          last={lastShown}
+          total={visible.length}
+          onGo={goTo}
+        />
+      )}
 
       {extendFor && (
         <ExtendDialog
@@ -492,5 +516,44 @@ function ChangePasswordDialog({ onClose, onDone }) {
         <button type="submit" className="btn-primary" disabled={busy}>{busy ? "Saving…" : "Change password"}</button>
       </form>
     </Dialog>
+  );
+}
+
+// "Showing 101–200 of 370" + Previous / numbered pages / Next.
+function Pager({ page, totalPages, first, last, total, onGo }) {
+  const nums = [];
+  for (let n = 1; n <= totalPages; n++) {
+    if (n === 1 || n === totalPages || Math.abs(n - page) <= 1) nums.push(n);
+    else if (nums[nums.length - 1] !== "…") nums.push("…");
+  }
+  return (
+    <nav className="admin-pager" aria-label="Pages">
+      <span className="admin-muted">Showing {first}–{last} of {total}</span>
+      {totalPages > 1 && (
+        <div className="admin-pager-btns">
+          <button type="button" className="admin-btn admin-btn-ghost" disabled={page === 1} onClick={() => onGo(page - 1)}>
+            ‹ Previous
+          </button>
+          {nums.map((n, i) =>
+            n === "…" ? (
+              <span key={`gap${i}`} className="admin-muted">…</span>
+            ) : (
+              <button
+                key={n}
+                type="button"
+                className={"admin-page-num" + (n === page ? " active" : "")}
+                aria-current={n === page ? "page" : undefined}
+                onClick={() => onGo(n)}
+              >
+                {n}
+              </button>
+            )
+          )}
+          <button type="button" className="admin-btn admin-btn-ghost" disabled={page === totalPages} onClick={() => onGo(page + 1)}>
+            Next ›
+          </button>
+        </div>
+      )}
+    </nav>
   );
 }
