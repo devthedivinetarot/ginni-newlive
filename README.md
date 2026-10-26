@@ -302,11 +302,17 @@ Tabs: Active / Expired / Never paid / All accounts, plus search. Data is read
 live from the database on every load, so accounts deleted by the cleanup
 disappear from the page automatically.
 
-**Access:** set `ADMIN_EMAILS` on Vercel (comma-separated). Those accounts
-log in on the normal page, then open `/admin`. Everyone else gets "not an
-admin" and every `/api/admin/*` route returns 401/403. Changes also require a
-same-site `Origin` header. Admin accounts are never deleted by the cleanup.
-Admin actions are logged to Vercel function logs as `[admin] …`.
+**Access:** `/admin` has its own login (email ID + password) and a
+"Forgot password? Reset it" link (same reset email as the main site). Admin
+emails are built into `lib/admin.js` (dev.thedivinetarot111@gmail.com,
+thedivinetarot111@gmail.com, thedivinetarotsupport@gmail.com); `ADMIN_EMAILS`
+on Vercel can add more (comma-separated). Their accounts are created / their
+password reset with `exports/ginni-create-admin-accounts.sql` (bcrypt hash
+only; exports/ is gitignored). Logged-in admins get "Change password" and
+"Log out". Everyone else gets "not an admin" and every `/api/admin/*` route
+returns 401/403. Changes also require a same-site `Origin` header. Admin
+accounts are never deleted by the cleanup. Admin actions are logged to Vercel
+function logs as `[admin] …`.
 
 ## Divine Insights newsletter (automated, Mon/Wed/Fri)
 

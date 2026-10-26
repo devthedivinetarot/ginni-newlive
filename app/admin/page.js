@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import PasswordInput from "@/components/PasswordInput";
 
 // /admin — subscribers, extend / end / refund. Data comes live from the
 // database on every load (GET /api/admin/subscribers), so accounts removed
 // by the daily cleanup disappear from here automatically. Only accounts in
-// ADMIN_EMAILS get past the API; everyone else sees the "not an admin" card.
+// the admin list (lib/admin.js) get past the API. Not logged in → the admin
+// login form (email + password, forgot password). Logged in but not an
+// admin → told so, with a way to switch account.
 
 const TZ = "Asia/Kolkata";
 function fmtDate(d) {
@@ -96,15 +99,21 @@ export default function AdminPage() {
     }
   }
 
+  const [changingPw, setChangingPw] = useState(false);
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    setState({ loading: false, error: null, status: 401, rows: [], admin: null });
+  }
+
   if (state.status === 401 || state.status === 403) {
     return (
       <div className="admin-page">
-        <div className="admin-gate">
-          <h1>Ginni Admin</h1>
-          <p>{state.error}</p>
-          <p className="admin-muted">Log in on the main page with an admin account, then come back to /admin.</p>
-          <Link href="/" className="btn-primary admin-gate-btn">Go to log in</Link>
-        </div>
+        <AdminLogin
+          notAdmin={state.status === 403}
+          onSwitchAccount={logout}
+          onLoggedIn={load}
+        />
       </div>
     );
   }
@@ -119,6 +128,12 @@ export default function AdminPage() {
         <div className="admin-header-actions">
           <button type="button" className="admin-btn" onClick={load} disabled={state.loading}>
             {state.loading ? "Loading…" : "Refresh"}
+          </button>
+          <button type="button" className="admin-btn admin-btn-ghost" onClick={() => setChangingPw(true)}>
+            Change password
+          </button>
+          <button type="button" className="admin-btn admin-btn-ghost" onClick={logout}>
+            Log out
           </button>
           <Link href="/" className="admin-btn admin-btn-ghost">Back to site</Link>
         </div>
@@ -229,6 +244,12 @@ export default function AdminPage() {
           onClose={() => setRefundFor(null)}
           onDone={(msg) => { setRefundFor(null); flash(msg); load(); }}
           onError={(msg) => flash(msg, "err")}
+        />
+      )}
+      {changingPw && (
+        <ChangePasswordDialog
+          onClose={() => setChangingPw(false)}
+          onDone={() => { setChangingPw(false); flash("Password changed. Use the new one next time you log in."); }}
         />
       )}
       {toast && <div className={"admin-toast " + toast.kind} role="status">{toast.text}</div>}
@@ -344,6 +365,131 @@ function RefundDialog({ row, onClose, onDone, onError }) {
         <button type="submit" className="btn-primary admin-danger-btn" disabled={busy || !order}>
           {busy ? "Refunding…" : `Refund ₹${amount}`}
         </button>
+      </form>
+    </Dialog>
+  );
+}
+
+// Shown on /admin when nobody (or a non-admin) is logged in. Uses the same
+// /api/auth/login and /api/auth/forgot-password as the main site; whether
+// the account is an admin is decided by the server on the next load.
+function AdminLogin({ notAdmin, onSwitchAccount, onLoggedIn }) {
+  const [mode, setMode] = useState("login"); // login | forgot
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [sent, setSent] = useState(null);
+
+  if (notAdmin) {
+    return (
+      <div className="admin-gate">
+        <h1>Ginni Admin</h1>
+        <p>This account isn&apos;t an admin.</p>
+        <button type="button" className="btn-primary admin-gate-btn" onClick={onSwitchAccount}>
+          Log in with an admin account
+        </button>
+        <p><Link href="/" className="admin-link">Back to site</Link></p>
+      </div>
+    );
+  }
+
+  async function submit(e) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      if (mode === "forgot") {
+        const d = await postJson("/api/auth/forgot-password", { email });
+        setSent(d.message || "If that account exists, a reset link is on its way.");
+      } else {
+        await postJson("/api/auth/login", { email, password });
+        setPassword("");
+        await onLoggedIn();
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="admin-gate">
+      <h1>Ginni Admin</h1>
+      <p className="admin-muted">
+        {mode === "login" ? "Log in with your admin email and password." : "Enter your admin email and we'll send a link to set a new password."}
+      </p>
+      {sent ? (
+        <p className="admin-sent" role="status">{sent}</p>
+      ) : (
+        <form onSubmit={submit} className="admin-login-form">
+          <label className="admin-field">
+            Email ID
+            <input type="email" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+          </label>
+          {mode === "login" && (
+            <label className="admin-field">
+              Password
+              <PasswordInput required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
+            </label>
+          )}
+          {error && <p className="admin-error">{error}</p>}
+          <button type="submit" className="btn-primary admin-gate-btn" disabled={busy}>
+            {busy ? "Please wait…" : mode === "login" ? "Log in" : "Send reset link"}
+          </button>
+        </form>
+      )}
+      <button
+        type="button"
+        className="admin-link"
+        onClick={() => { setMode(mode === "login" ? "forgot" : "login"); setError(null); setSent(null); }}
+      >
+        {mode === "login" ? "Forgot password? Reset it" : "Back to log in"}
+      </button>
+    </div>
+  );
+}
+
+function ChangePasswordDialog({ onClose, onDone }) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function submit(e) {
+    e.preventDefault();
+    setError(null);
+    if (next.length < 8) return setError("New password must be at least 8 characters.");
+    if (next !== confirm) return setError("The two new passwords don't match.");
+    setBusy(true);
+    try {
+      await postJson("/api/auth/change-password", { currentPassword: current, newPassword: next });
+      onDone();
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog title="Change password" onClose={onClose}>
+      <form onSubmit={submit}>
+        <label className="admin-field">
+          Current password
+          <PasswordInput required autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        </label>
+        <label className="admin-field">
+          New password (at least 8 characters)
+          <PasswordInput required minLength={8} autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
+        </label>
+        <label className="admin-field">
+          Repeat new password
+          <PasswordInput required minLength={8} autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        </label>
+        {error && <p className="admin-error">{error}</p>}
+        <button type="submit" className="btn-primary" disabled={busy}>{busy ? "Saving…" : "Change password"}</button>
       </form>
     </Dialog>
   );
