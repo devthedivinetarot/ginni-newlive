@@ -22,13 +22,19 @@ import { createPortal } from "react-dom";
 const MAIN_SITE = "https://thedivinetarotonline.com";
 const READING_SITE = "https://reading.thedivinetarotonline.com/";
 
+// Same items, order, labels and targets as the main site's nav (Nov 2026):
+// only Course and Personal Reading open a new tab there. Ginni IS the
+// "Reading" page (reading.thedivinetarotonline.com serves this app), so it
+// carries the site's current-page style: gold + 2px gold underline, and a
+// tinted row in the phone drawer.
 const NAV_LINKS = [
   { href: `${MAIN_SITE}/`, label: "Home" },
   { href: `${MAIN_SITE}/about`, label: "About" },
-  { href: READING_SITE, label: "Reading", isExternal: true },
+  { href: READING_SITE, label: "Reading", current: true },
   { href: "https://learn.thedivinetarotonline.com/", label: "Course", isExternal: true },
   { href: `${MAIN_SITE}/kundli-milan`, label: "Kundli Milan" },
-  { href: "https://booking.thedivinetarotonline.com/", label: "Personal Booking", isExternal: true },
+  { href: `${MAIN_SITE}/reports`, label: "Reports" },
+  { href: "https://booking.thedivinetarotonline.com/", label: "Personal Reading", isExternal: true },
 ];
 
 const CTA_HREF = READING_SITE;
@@ -93,8 +99,10 @@ export default function SiteHeader({ lang = "hinglish", onChangeLang }) {
     };
   }, [open]);
 
-  const linkProps = (link) =>
-    link.isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {};
+  const linkProps = (link) => ({
+    ...(link.isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {}),
+    ...(link.current ? { className: "active", "aria-current": "page" } : {}),
+  });
 
   return (
     <>

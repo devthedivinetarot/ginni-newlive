@@ -244,7 +244,9 @@ export default function SiteFooter() {
         <div className="site-footer-bottom-links">
           <a href={`${MAIN_SITE}/privacy`}>Privacy</a>
           <span className="site-footer-divider" />
-          <span>{year}</span>
+          <a href={`${MAIN_SITE}/refund-policy`}>Refunds</a>
+          <span className="site-footer-divider" />
+          <span>&copy; {year} The Divine Tarot. All rights reserved.</span>
         </div>
       </div>
     </footer>

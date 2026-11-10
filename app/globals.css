@@ -1047,7 +1047,7 @@ button{font-family:inherit;}
 .site-nav a:hover{color:#fff;}
 .site-nav a.active{color:#ffd700;}
 .site-nav a.active::after{
-  content:""; position:absolute; left:0; right:0; bottom:0;
+  content:""; position:absolute; left:0; right:0; bottom:-4px;
   height:2px; background:#ffd700;
 }
 
@@ -1963,3 +1963,32 @@ button{font-family:inherit;}
 .admin-pager-btns{display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
 .admin-page-num{min-width:36px; height:36px; border-radius:999px; border:1px solid var(--hairline-strong); background:transparent; color:var(--text-primary); font-size:13px; cursor:pointer;}
 .admin-page-num.active{border-color:var(--gold, #f4c542); background:rgba(244,197,66,0.14); font-weight:600;}
+
+/* Nov 2026 re-match with thedivinetarotonline.com (measured): the site sets
+   explicit line heights (Tailwind text-sm/xs/lg), which gives its 36px nav
+   links and CTA, 46px footer inputs, 44px subscribe button and the spacing
+   between footer rows. Logo keeps its natural aspect (40 x 47 there). */
+.site-brand-logo{height:auto !important;}
+.site-brand-name{line-height:24px;}
+.site-brand-tag{line-height:1.25;}
+@media (min-width:640px){ .site-brand-name{line-height:28px;} }
+.site-nav a, .site-cta{line-height:20px;}
+.site-footer-brand-name{line-height:28px;}
+.site-footer-brand-tag{line-height:1.4;}
+.site-footer-desc{line-height:1.625; margin-top:4px;}
+.site-footer-heading{line-height:20px;}
+.site-footer-links a{line-height:20px;}
+.site-footer-privacy-inline{line-height:1.4; margin-top:12px;}
+.site-footer-input, .site-footer-submit{line-height:20px;}
+.site-footer-trust-item{line-height:1.4;}
+.site-footer-bottom{line-height:20px;}
+.site-footer-bottom-links{flex-wrap:wrap; row-gap:4px;}
+/* Phone drawer, measured against the site's: 44px close target, 48px rows,
+   centred language toggle, 51px CTA in 16px type. */
+.site-drawer-title{line-height:28px;}
+.site-drawer-close{min-width:44px; min-height:44px;}
+.site-drawer-nav > a{line-height:24px;}
+.site-lang-btn{line-height:1.4;}
+.site-drawer-extra{gap:12px;}
+.site-drawer-extra .site-lang{align-self:center; margin-bottom:4px;}
+.site-drawer-extra .site-cta-block{font-size:16px; line-height:27.2px;}
