@@ -235,12 +235,12 @@ export default function SiteFooter() {
 
       {/* COPYRIGHT BAR */}
       <div className="site-footer-bottom">
-        <div>
+        {/* <div>
           Designed by{" "}
           <a href="https://sitelytc.com/" target="_blank" rel="noopener noreferrer" className="site-footer-designedby">
             Sitelytc
           </a>
-        </div>
+        </div> */}
         <div className="site-footer-bottom-links">
           <a href={`${MAIN_SITE}/privacy`}>Privacy</a>
           <span className="site-footer-divider" />
