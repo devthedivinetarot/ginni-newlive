@@ -2,14 +2,15 @@ import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withRetry } from "@/lib/withRetry";
-import { getSessionUser, verifyPassword, hashPassword } from "@/lib/auth";
+import { bearerToken, getSessionUser, verifyPassword, hashPassword } from "@/lib/auth";
 import { isSameOrigin } from "@/lib/admin";
 
 // POST { currentPassword, newPassword } — the logged-in person changes their
 // own password (used by the "Change password" button on /admin). The current
 // password must be right; the new one at least 8 characters and different.
 export async function POST(req) {
-  if (!isSameOrigin(req)) return NextResponse.json({ error: "Bad origin." }, { status: 403 });
+  // Cookie sessions need a same-site request (CSRF); the app's Bearer token can't be sent by another site.
+  if (!isSameOrigin(req) && !(await bearerToken())) return NextResponse.json({ error: "Bad origin." }, { status: 403 });
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Please log in first." }, { status: 401 });
 

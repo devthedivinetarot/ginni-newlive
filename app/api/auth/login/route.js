@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyPassword, setSessionCookie, summarizeAccess } from "@/lib/auth";
+import { createSessionCookieValue, verifyPassword, setSessionCookie, summarizeAccess } from "@/lib/auth";
 import { withRetry } from "@/lib/withRetry";
 
 export async function POST(req) {
@@ -35,6 +35,10 @@ export async function POST(req) {
 
     await setSessionCookie(user.id);
 
+    // The mobile app keeps the session itself (see getSessionUser in lib/auth.js)
+    if (req.headers.get("x-tdt-app") === "1") {
+      return NextResponse.json({ ...summarizeAccess(user), token: createSessionCookieValue(user.id) });
+    }
     return NextResponse.json(summarizeAccess(user));
   } catch (err) {
     console.error("Login failed:", err);
